@@ -1,13 +1,13 @@
 # commonly generated files
-__pycache__
+**/__pycache__
 *.pyc
 *.pyo
 .pytest_cache/
 .git
 .svn
-node_modules/
-dist/
-build/
+**/node_modules/
+**/dist/
+**/build/
 
 # IDE and editor configuration
 .idea/

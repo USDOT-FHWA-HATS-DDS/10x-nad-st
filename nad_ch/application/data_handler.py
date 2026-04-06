@@ -1,6 +1,6 @@
 import os
 from geopandas import GeoDataFrame, read_file
-import fiona
+import pyogrio
 from typing import Optional, Dict, Iterator
 import shutil
 from zipfile import ZipFile
@@ -71,7 +71,7 @@ class DataHandler(object):
     ) -> Iterator[GeoDataFrame]:
         # TODO: Modify to return a joined table; for cases where 1 or more tables
         # are needed to get all fields from source file.
-        if table_name and table_name not in fiona.listlayers(path):
+        if table_name and table_name not in [layer[0] for layer in pyogrio.list_layers(path)]:
             raise Exception(f"Table name {table_name} does not exist")
         i = 0
         while True:
@@ -97,7 +97,7 @@ class DataHandler(object):
                 filename=self.mapped_data_path,
                 index=False,
                 mode=write_mode,
-                engine="fiona",
+                engine="pyogrio",
             )
         except Exception:
             shutil.rmtree(self.mapped_data_dir)

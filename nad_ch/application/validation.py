@@ -1,7 +1,7 @@
 import os
 from typing import Dict, List, Optional, IO
 from zipfile import ZipFile
-import fiona
+import pyogrio
 from geopandas import GeoDataFrame
 import pandas as pd
 import shapefile
@@ -257,19 +257,19 @@ class FileValidator:
         zip_file.extractall(temp_dir)
         gdb_path = os.path.join(temp_dir, gdb_dir)
 
-        layers = fiona.listlayers(gdb_path)
+        layers = [layer[0] for layer in pyogrio.list_layers(gdb_path)]
 
         for layer_name in layers:
-            with fiona.open(gdb_path, layer=layer_name) as layer:
-                fields = layer.schema["properties"].keys()
-                filtered_expected_fields = [
-                    value
-                    for value in expected_schema.values()
-                    if value not in [None, ""]
-                ]
+            info = pyogrio.read_info(gdb_path, layer=layer_name)
+            fields = info["fields"]
+            filtered_expected_fields = [
+                value
+                for value in expected_schema.values()
+                if value not in [None, ""]
+            ]
 
-                all_present = all(value in fields for value in filtered_expected_fields)
-                if all_present:
-                    return True
+            all_present = all(value in fields for value in filtered_expected_fields)
+            if all_present:
+                return True
 
         return False

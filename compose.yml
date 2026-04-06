@@ -11,24 +11,22 @@ services:
       - storage
       - flower
     build: .
-    volumes:
-      - .:/app
     env_file:
       - .env
 
   postgres:
     container_name: postgres
-    image: postgres:13
+    image: postgres:18
     ports:
       - "5432:5432"
     volumes:
-      - /var/lib/postgresql/data
+      - ${VOLUMES}/nad_pgvol/data:/var/lib/postgresql:z
     env_file:
       - .env
 
   redis:
     container_name: redis
-    image: redis:5
+    image: redis:7-alpine
     ports:
       - "6379:6379"
     env_file:
@@ -41,7 +39,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - ./storage/:/storage
+      - ${VOLUMES}/s3_miniovol/storage:/storage:z
     env_file:
       - .env
     command: server /storage --console-address :9001

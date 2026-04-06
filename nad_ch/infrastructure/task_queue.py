@@ -5,7 +5,6 @@ from nad_ch.config.development_local import (
 from nad_ch.config.development_remote import (
     DevRemoteApplicationContext as dev_remote_app_context,
 )
-from nad_ch.config.test import TestApplicationContext as test_app_context
 from celery import Celery
 from nad_ch.application.dtos import (
     DataSubmissionReport,
@@ -123,5 +122,7 @@ class TaskHelperFunctions:
         elif APP_ENV == "dev_remote":
             app_context = dev_remote_app_context
         elif APP_ENV == "test":
+            from nad_ch.config.test import TestApplicationContext as test_app_context
+
             app_context = test_app_context
         return app_context
