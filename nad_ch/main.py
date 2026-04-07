@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 from nad_ch.config import create_app_context
 from nad_ch.config import PORT
 from nad_ch.controllers.cli import cli
@@ -15,8 +16,9 @@ def run_cli(args):
 
 
 def serve_flask_app():
+    debug = os.getenv("FLASK_DEBUG", "").lower() in ["1", "true", "yes"]
     flask_app = create_flask_application(ctx)
-    flask_app.run(host="0.0.0.0", port=PORT)
+    flask_app.run(host="0.0.0.0", port=PORT, debug=debug)
 
 
 if __name__ == "__main__":

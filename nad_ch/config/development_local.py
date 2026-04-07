@@ -49,6 +49,7 @@ class DevLocalApplicationContext(ApplicationContext):
         self._storage = self.create_storage()
         self._task_queue = self.create_task_queue()
         self._auth = self.create_auth()
+        self._dev_auth_email = DEV_AUTH_EMAIL
 
     def create_producer_repository(self):
         return SqlAlchemyDataProducerRepository(self._session_factory)

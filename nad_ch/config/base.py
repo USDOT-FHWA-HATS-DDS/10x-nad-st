@@ -24,5 +24,12 @@ OAUTH2_CONFIG = {
         "acr_values": "http://idmanagement.gov/ns/assurance/ial/1",
         "scopes": ["openid", "email", "profile"],
         "nonce": lambda: secrets.token_urlsafe(64),
-    }
+    },
+    "dev": {
+        "client_id": "dev-client-id",
+        "authorize_url": "http://localhost:5000/auth/local-login",
+        "logout_url": "http://localhost:5000/",
+        "scopes": ["openid", "email", "profile"],
+    },
 }
+DEV_AUTH_EMAIL = os.getenv("DEV_AUTH_EMAIL")

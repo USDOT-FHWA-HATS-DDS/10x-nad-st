@@ -93,6 +93,10 @@ class ApplicationContext:
     def auth(self) -> Authentication:
         return self._auth
 
+    @property
+    def dev_auth_email(self) -> Optional[str]:
+        return self._dev_auth_email
+
     def __getitem__(self, key: str):
         if key == "producers":
             return self.producers
@@ -110,5 +114,7 @@ class ApplicationContext:
             return self.task_queue
         elif key == "auth":
             return self.auth
+        elif key == "dev_auth_email":
+            return self.dev_auth_email
         else:
             raise KeyError(f"Invalid key: {key}")

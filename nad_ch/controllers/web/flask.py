@@ -1,8 +1,10 @@
 import os
 from flask import Flask, render_template
 from nad_ch.application.interfaces import ApplicationContext
+from nad_ch.application.use_cases.auth import get_or_create_user
 from nad_ch.controllers.web.routes.auth import setup_auth, user_loader, auth_bp
 from nad_ch.controllers.web.routes.data_submissions import submissions_bp
+from flask_login import login_user, current_user
 from nad_ch.controllers.web.routes.column_maps import column_maps_bp
 
 
@@ -18,6 +20,15 @@ def create_flask_application(ctx: ApplicationContext):
     app.extensions["ctx"] = ctx
 
     app = setup_auth(app, user_loader)
+
+    @app.before_request
+    def auto_login():
+        if ctx.dev_auth_email and current_user.is_anonymous:
+            try:
+                user = get_or_create_user(ctx, "dev", ctx.dev_auth_email)
+                login_user(user)
+            except Exception as e:
+                ctx.logger.error(f"Auto-login failed: {e}")
 
     @app.route("/")
     def index():

@@ -5,7 +5,7 @@ from nad_ch.application.exceptions import (
     OAuth2TokenError,
 )
 from nad_ch.application.interfaces import ApplicationContext
-from nad_ch.core.entities import User
+from nad_ch.core.entities import User, DataProducer
 
 
 def get_or_create_user(ctx: ApplicationContext, provider_name: str, email: str) -> User:
@@ -16,6 +16,8 @@ def get_or_create_user(ctx: ApplicationContext, provider_name: str, email: str) 
     user = ctx.users.get_by_email(email)
 
     if user:
+        if provider_name == "dev" and not user.is_active:
+            _enrich_dev_user(ctx, user)
         return user
 
     if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
@@ -29,7 +31,22 @@ def get_or_create_user(ctx: ApplicationContext, provider_name: str, email: str) 
         logout_url=ctx.auth.get_logout_url(provider_name),
     )
     saved_user = ctx.users.add(new_user)
+
+    if provider_name == "dev":
+        _enrich_dev_user(ctx, saved_user)
+
     return saved_user
+
+
+def _enrich_dev_user(ctx: ApplicationContext, user: User) -> User:
+    producer_name = "Dev Producer"
+    producer = ctx.producers.get_by_name(producer_name)
+    if not producer:
+        producer = DataProducer(producer_name)
+        producer = ctx.producers.add(producer)
+
+    user.associate_with_data_producer(producer).activate()
+    return ctx.users.update(user)
 
 
 def get_logged_in_user_redirect_url(

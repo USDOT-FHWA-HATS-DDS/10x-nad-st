@@ -101,11 +101,11 @@ class AuthenticationImplementation(Authentication):
         return None
 
     def get_logout_url(self, provider_name: str) -> str | None:
-        provider_config = self._providers[provider_name]
+        provider_config = self._providers.get(provider_name)
         if not provider_config:
             return None
 
-        return provider_config["logout_url"]
+        return provider_config.get("logout_url")
 
     def make_login_url(
         self,
@@ -114,7 +114,7 @@ class AuthenticationImplementation(Authentication):
         acr_values: str = None,
         nonce: str = None,
     ) -> str | None:
-        provider_config = self._providers[provider_name]
+        provider_config = self._providers.get(provider_name)
         if not provider_config:
             return None
 
@@ -141,7 +141,7 @@ class AuthenticationImplementation(Authentication):
         return provider_config["authorize_url"] + "?" + query_string
 
     def make_logout_url(self, provider_name: str) -> str | None:
-        provider_config = self._providers[provider_name]
+        provider_config = self._providers.get(provider_name)
         if not provider_config:
             return None
 

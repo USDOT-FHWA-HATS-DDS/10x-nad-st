@@ -127,3 +127,14 @@ def oauth2_callback(provider: str):
         abort(400, description=e.message)
     except OAuth2TokenError as e:
         abort(401, description=e.message)
+
+
+@auth_bp.route("/local-login")
+def local_login():
+    if not g.ctx.dev_auth_email:
+        abort(404)
+
+    email = request.args.get("email") or g.ctx.dev_auth_email
+    user = get_or_create_user(g.ctx, "dev", email)
+    login_user(user)
+    return redirect(url_for(login_view))
