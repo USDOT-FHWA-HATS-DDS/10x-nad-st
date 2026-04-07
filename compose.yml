@@ -10,9 +10,15 @@ services:
       - redis
       - storage
       - flower
-    build: .
+    build:
+      context: .
+      target: dev
     env_file:
       - .env
+    volumes:
+      - .:/app:z
+      - /app/nad_ch/controllers/web/node_modules:z
+      - /app/nad_ch/controllers/web/dist:z
 
   postgres:
     container_name: postgres
