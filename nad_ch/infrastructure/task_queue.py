@@ -17,7 +17,8 @@ from nad_ch.application.validation import DataValidator
 from nad_ch.config import QUEUE_BROKER_URL, QUEUE_BACKEND_URL
 from nad_ch.core.repositories import DataSubmissionRepository
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Any
+from nad_ch.core.entities import DataSubmissionStatus
 
 
 celery_app = Celery(
@@ -43,24 +44,67 @@ celery_app.conf.update(
 
 @celery_app.task(bind=True, max_retries=2)
 def load_and_validate(
-    self, gdb_file_path: str, column_map: Dict[str, str], mapped_data_dir: str
-) -> dict:
+    self,
+    submission_id: int,
+    file_path: str,
+    column_map: Dict[str, str],
+    mapped_data_dir: str,
+) -> Any:
+    import os
+    os.environ["SHAPE_RESTORE_SHX"] = "YES"
+
+    app_context = TaskHelperFunctions.get_app_context_instance()
+    app_context.logger.info(f"Task load_and_validate started for submission {submission_id}")
+    app_context.logger.info(f"  file_path: {file_path}")
+    app_context.logger.info(f"  mapped_data_dir: {mapped_data_dir}")
+    temp_dir = None
     try:
+        storage = app_context.create_storage()
+        download_result = storage.download_temp(file_path)
+        if not download_result:
+            raise Exception(f"Failed to download file from storage: {file_path}")
+
+        temp_dir = download_result.temp_dir
+        gdb_file_path = download_result.extracted_dir
+        app_context.logger.info(f"  extracted_dir: {gdb_file_path}")
+
         data_handler = DataHandler(column_map, mapped_data_dir)
-        first_batch = True
+        batch_count = 0
         for gdf in data_handler.read_file_in_batches(path=gdb_file_path):
-            if first_batch:
+            batch_count += 1
+            if batch_count == 1:
                 data_validator = DataValidator(data_handler.valid_renames)
             data_validator.run(gdf)
-            first_batch = False
+
         data_validator.finalize_overview_details()
         report = DataSubmissionReport(
             data_validator.report_overview,
             list(data_validator.report_features.values()),
         )
+        report_dict = report_to_dict(report)
+
+        app_context.submissions.update_report(submission_id, report_dict)
+        app_context.logger.info(f"Task load_and_validate completed for submission {submission_id}. Batches: {batch_count}")
+
+        return report_dict
     except Exception as e:
-        raise self.retry(exec=e, countdown=30)
-    return report_to_dict(report)
+        app_context.logger.error(f"Task load_and_validate failed for submission {submission_id}: {e}")
+        try:
+            self.retry(exc=e, countdown=30)
+        except self.MaxRetriesExceededError:
+            app_context = TaskHelperFunctions.get_app_context_instance()
+            app_context.submissions.update_status(
+                submission_id, DataSubmissionStatus.FAILED
+            )
+            raise e
+    finally:
+        if temp_dir and os.path.exists(temp_dir):
+            import shutil
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                app_context = TaskHelperFunctions.get_app_context_instance()
+                app_context.logger.warning(f"Failed to cleanup temp dir {temp_dir}: {e}")
 
 
 @celery_app.task(bind=True, max_retries=2)
@@ -69,7 +113,7 @@ def copy_mapped_data_to_remote(
 ) -> bool:
     try:
         success = True
-        app_context = TaskHelperFunctions.get_app_context()
+        app_context = TaskHelperFunctions.get_app_context_instance()
         storage_interface = app_context.create_storage()
         filename = mapped_data_remote_dir.split("/")[-1]
         timestamp = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H%M%S")
@@ -79,7 +123,17 @@ def copy_mapped_data_to_remote(
             os.path.join(mapped_data_remote_dir, f"{filename}_{timestamp}.zip"),
         )
     except Exception as e:
-        raise self.retry(exec=e, countdown=30)
+        raise self.retry(exc=e, countdown=30)
+    finally:
+        # Clean up temporary directory after processing
+        if mapped_data_local_dir and os.path.exists(mapped_data_local_dir):
+            import shutil
+            try:
+                shutil.rmtree(mapped_data_local_dir)
+            except Exception as e:
+                # Log cleanup error but don't fail the task
+                app_context = TaskHelperFunctions.get_app_context_instance()
+                app_context.logger.warning(f"Failed to cleanup temp dir {mapped_data_local_dir}: {e}")
     return success
 
 
@@ -91,38 +145,36 @@ class CeleryTaskQueue(TaskQueue):
         self,
         submissions: DataSubmissionRepository,
         submission_id: int,
-        path: str,
+        file_path: str,
         column_map: Dict[str, str],
         mapped_data_dir: str,
     ):
-        task_result = load_and_validate.apply_async(args=[path, column_map, ""])
-        report_dict = task_result.get()
-        submissions.update_report(submission_id, report_dict)
-        return report_from_dict(report_dict)
+        result = load_and_validate.apply_async(args=[submission_id, file_path, column_map, mapped_data_dir])
+        app_context = TaskHelperFunctions.get_app_context_instance()
+        app_context.logger.info(f"DEBUG: Task load_and_validate enqueued with ID: {result.id} to broker {load_and_validate.app.conf.broker_url}")
+        return True
 
     def run_copy_mapped_data_to_remote(
         self,
         mapped_data_dir: str,
         mapped_data_remote_dir: str,
     ):
-        task_result = copy_mapped_data_to_remote.apply_async(
+        copy_mapped_data_to_remote.apply_async(
             args=[mapped_data_dir, mapped_data_remote_dir]
         )
-        success = task_result.get()
-        return success
+        return True
 
 
 class TaskHelperFunctions:
 
     @staticmethod
-    def get_app_context():
+    def get_app_context_instance():
         APP_ENV = os.environ.get("APP_ENV")
         if APP_ENV == "dev_local":
-            app_context = dev_local_app_context
+            from nad_ch.config.development_local import create_app_context
         elif APP_ENV == "dev_remote":
-            app_context = dev_remote_app_context
+            from nad_ch.config.development_remote import create_app_context
         elif APP_ENV == "test":
-            from nad_ch.config.test import TestApplicationContext as test_app_context
+            from nad_ch.config.test import create_app_context
 
-            app_context = test_app_context
-        return app_context
+        return create_app_context()

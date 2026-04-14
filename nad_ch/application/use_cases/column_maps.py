@@ -27,8 +27,9 @@ def add_column_map(
 
     column_map = ColumnMap(name, producer, mapping, 1)
 
-    if not column_map.is_valid():
-        raise ValueError("Invalid mapping")
+    invalid_fields = column_map.get_invalid_fields()
+    if len(invalid_fields) > 0:
+        raise ValueError(f"Invalid mapping. Missing required fields: {', '.join(invalid_fields)}")
 
     saved_column_map = ctx.column_maps.add(column_map)
     ctx.logger.info("Column Map added")
@@ -68,8 +69,9 @@ def update_column_mapping(
         key: new_mapping[key] for key in ColumnMap.all_fields if key in new_mapping
     }
 
-    if not column_map.is_valid():
-        raise ValueError("Invalid mapping")
+    invalid_fields = column_map.get_invalid_fields()
+    if len(invalid_fields) > 0:
+        raise ValueError(f"Invalid mapping. Missing required fields: {', '.join(invalid_fields)}")
 
     ctx.column_maps.update(column_map)
 
@@ -92,8 +94,9 @@ def update_column_mapping_field(
         if key in column_map.mapping
     }
 
-    if not column_map.is_valid():
-        raise ValueError("Invalid mapping")
+    invalid_fields = column_map.get_invalid_fields()
+    if len(invalid_fields) > 0:
+        raise ValueError(f"Invalid mapping. Missing required fields: {', '.join(invalid_fields)}")
 
     ctx.column_maps.update(column_map)
 
@@ -118,3 +121,14 @@ def get_column_map_from_csv_file(file: IO[bytes]) -> Dict[str, str]:
         csv_dict[key] = value
 
     return csv_dict
+
+
+def delete_column_map(ctx: ApplicationContext, id: int) -> bool:
+    column_map = ctx.column_maps.get_by_id(id)
+
+    if column_map is None:
+        ctx.logger.error(f"Column map with ID {id} does not exist")
+        return False
+
+    ctx.logger.info(f"Deleting column map: {column_map.name} (ID: {id})")
+    return ctx.column_maps.delete(id)

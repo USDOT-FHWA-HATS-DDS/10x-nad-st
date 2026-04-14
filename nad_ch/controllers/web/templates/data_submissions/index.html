@@ -1,5 +1,50 @@
 {% extends "_layouts/base.html" %} {% block title %}Submissions{% endblock %} {%
-block content %}
+from "components/icons/eye.html" import eye %}
+{% from "components/icons/refresh.html" import refresh %}
+{% from "components/icons/reset.html" import reset %}
+{% from "components/icons/x.html" import x %}
+{% block content %}
+<style>
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #71767a;
+  border-radius: 4px;
+  background: white;
+  color: #71767a;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.action-btn:hover {
+  background: #e6e6e6;
+  border-color: #71767a;
+}
+.action-btn:focus {
+  outline: 2px solid #71767a;
+  outline-offset: 2px;
+}
+.action-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.action-btn--danger {
+  color: #b50909;
+}
+.action-btn--danger:hover {
+  background: #fff3f3;
+  border-color: #b50909;
+}
+</style>
 <header class="usa-header usa-header--basic">
   <div class="usa-nav-container">
     <div class="usa-navbar">
@@ -24,44 +69,80 @@ block content %}
 </header>
 
 {% if submissions %}
-<div class="usa-table-default width-full">
-  <table class="usa-table usa-table--borderless width-full">
-    <thead class="bg-base-lighter border-bottom-2px border-base-light">
-      <tr>
-        <th scope="col">Name</th>
-        <th scope="col">Created</th>
-        <th scope="col">Status</th>
-        <th scope="col"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for sub in submissions %}
-      <tr>
-        <th class="border-bottom-1px border-base-lightest" scope="row">
-          {{ sub.name }}
-        </th>
-        <td>{{ sub.date_created }}</td>
-        <td>
-          <span class="usa-tag {{ sub.status_tag_class }}"
-            >{{ sub.status }}</span
-          >
-        </td>
-        <td>
-          {% if sub.status == "Validated" %}
-          <a href="{{ url_for('submissions.show', id=sub.id, _external=True) }}"
-            >View Report</a
-          >
-          {% else %}
+<div x-data="SubmissionActions()">
+  <div id="action-feedback" class="usa-alert usa-alert--success display-none" role="alert">
+    <div class="usa-alert__body">
+      <p class="usa-alert__text" id="action-feedback-message"></p>
+    </div>
+  </div>
+  <div id="action-error" class="usa-alert usa-alert--error display-none" role="alert">
+    <div class="usa-alert__body">
+      <p class="usa-alert__text" id="action-error-message"></p>
+    </div>
+  </div>
 
-          <a href="{{ url_for('submissions.edit', id=sub.id, _external=True) }}"
-            >View</a
-          >
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="usa-table-default width-full">
+    <table class="usa-table usa-table--borderless width-full">
+      <thead class="bg-base-lighter border-bottom-2px border-base-light">
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Created</th>
+          <th scope="col">Status</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sub in submissions %}
+        <tr>
+          <th class="border-bottom-1px border-base-lightest" scope="row">
+            {{ sub.name }}
+          </th>
+          <td>{{ sub.date_created }}</td>
+          <td>
+            <span class="usa-tag {{ sub.status_tag_class }}"
+              >{{ sub.status }}</span
+            >
+          </td>
+          <td>
+            <div class="action-buttons">
+              {% if sub.status == "Validated" %}
+              <a href="{{ url_for('submissions.show', id=sub.id, _external=True) }}"
+                class="action-btn"
+                title="View Report">
+                {{ eye() }}
+              </a>
+              {% else %}
+              <a href="{{ url_for('submissions.edit', id=sub.id, _external=True) }}"
+                class="action-btn"
+                title="View">
+                {{ eye() }}
+              </a>
+              {% endif %}
+              
+              {% if sub.status == "Pending submission" %}
+              <button @click="retry({{ sub.id }})" class="action-btn" title="Retry">
+                {{ refresh() }}
+              </button>
+              {% endif %}
+              
+              {% if sub.status == "Pending validation" or sub.status == "Validation failed" %}
+              <button @click="reset({{ sub.id }})" class="action-btn" title="Reset">
+                {{ reset() }}
+              </button>
+              {% endif %}
+              
+              {% if sub.status != "Validated" and sub.status != "Canceled" %}
+              <button @click="cancel({{ sub.id }})" class="action-btn action-btn--danger" title="Cancel">
+                {{ x() }}
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% else %}
 <div class="usa-card padding-top-2 grid-col-4">
@@ -148,4 +229,66 @@ block content %}
     </div>
   </div>
 </div>
+
+<script>
+function SubmissionActions() {
+  return {
+    showFeedback(message) {
+      const el = document.getElementById('action-feedback');
+      document.getElementById('action-feedback-message').textContent = message;
+      el.classList.remove('display-none');
+      setTimeout(() => el.classList.add('display-none'), 5000);
+    },
+    showError(message) {
+      const el = document.getElementById('action-error');
+      document.getElementById('action-error-message').textContent = message;
+      el.classList.remove('display-none');
+      setTimeout(() => el.classList.add('display-none'), 5000);
+    },
+    async retry(id) {
+      try {
+        const res = await fetch(`/api/submissions/${id}/retry`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          this.showFeedback('Submission retry initiated. Refreshing page...');
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          this.showError(data.error || 'Failed to retry submission');
+        }
+      } catch (e) {
+        this.showError('Failed to retry submission: ' + e.message);
+      }
+    },
+    async reset(id) {
+      try {
+        const res = await fetch(`/api/submissions/${id}/reset`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          this.showFeedback('Submission reset. Refreshing page...');
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          this.showError(data.error || 'Failed to reset submission');
+        }
+      } catch (e) {
+        this.showError('Failed to reset submission: ' + e.message);
+      }
+    },
+    async cancel(id) {
+      if (!confirm('Are you sure you want to cancel this submission?')) return;
+      try {
+        const res = await fetch(`/api/submissions/${id}/cancel`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          this.showFeedback('Submission canceled. Refreshing page...');
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          this.showError(data.error || 'Failed to cancel submission');
+        }
+      } catch (e) {
+        this.showError('Failed to cancel submission: ' + e.message);
+      }
+    }
+  }
+}
+</script>
 {% endblock %}

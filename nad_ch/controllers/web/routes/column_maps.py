@@ -13,6 +13,7 @@ from flask import (
 from flask_login import login_required, current_user
 from nad_ch.application.use_cases.column_maps import (
     add_column_map,
+    delete_column_map,
     get_column_map,
     get_column_maps_by_producer,
     update_column_mapping,
@@ -129,3 +130,19 @@ def edit(id):
         return render_template("column_maps/edit.html", column_map=view_model)
     except Exception:
         abort(404)
+
+
+@column_maps_bp.route("/column-maps/delete/<id>", methods=["POST"])
+@login_required
+def delete(id):
+    try:
+        success = delete_column_map(g.ctx, id)
+        if success:
+            flash("Mapping deleted successfully")
+            return redirect(url_for("column_maps.index"))
+        else:
+            flash("Failed to delete mapping")
+            return redirect(url_for("column_maps.show", id=id))
+    except Exception as e:
+        flash(f"Error: {e}")
+        return redirect(url_for("column_maps.show", id=id))

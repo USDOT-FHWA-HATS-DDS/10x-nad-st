@@ -106,6 +106,7 @@ class DataSubmissionViewModel(ViewModel):
     status: str
     status_tag_class: str
     producer_name: str
+    file_path: str
     report: str
 
 
@@ -137,6 +138,7 @@ def create_data_submission_vm(submission: DataSubmission) -> DataSubmissionViewM
         status=status_map[submission.status],
         status_tag_class=status_tag_class_map[submission.status],
         producer_name=submission.producer.name,
+        file_path=submission.file_path,
         report=report_json,
     )
 

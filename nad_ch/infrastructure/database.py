@@ -346,6 +346,22 @@ class SqlAlchemyDataSubmissionRepository(DataSubmissionRepository):
             else:
                 return None
 
+    def update_status(self, id: int, status: DataSubmissionStatus) -> None:
+        with session_scope(self.session_factory) as session:
+            submission_model = (
+                session.query(DataSubmissionModel)
+                .filter(DataSubmissionModel.id == id)
+                .first()
+            )
+
+            if submission_model:
+                submission_model.status = status
+                session.commit()
+                session.refresh(submission_model)
+                return submission_model.to_entity()
+            else:
+                return None
+
 
 class SqlAlchemyUserRepository(UserRepository):
     def __init__(self, session_factory):
@@ -494,3 +510,16 @@ class SqlAlchemyColumnMapRepository(ColumnMapRepository):
             session.commit()
             session.refresh(existing_column_map)
             return existing_column_map.to_entity()
+
+    def delete(self, id: int) -> bool:
+        with session_scope(self.session_factory) as session:
+            column_map_model = (
+                session.query(ColumnMapModel)
+                .filter(ColumnMapModel.id == id)
+                .first()
+            )
+            if column_map_model:
+                session.delete(column_map_model)
+                session.commit()
+                return True
+            return False

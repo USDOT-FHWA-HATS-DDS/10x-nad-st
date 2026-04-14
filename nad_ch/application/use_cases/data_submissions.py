@@ -33,6 +33,55 @@ def get_data_submission(
     return get_view_model(submission)
 
 
+def reset_data_submission(
+    ctx: ApplicationContext, submission_id: int
+) -> DataSubmissionViewModel:
+    submission = ctx.submissions.get_by_id(submission_id)
+
+    if submission is None:
+        ctx.logger.error(f"Data submission with ID {submission_id} does not exist")
+        return None
+
+    ctx.logger.info(
+        f"Resetting submission {submission_id} from '{submission.status.value}' to PENDING_SUBMISSION"
+    )
+
+    ctx.submissions.update_status(
+        submission.id, DataSubmissionStatus.PENDING_SUBMISSION
+    )
+
+    submission.status = DataSubmissionStatus.PENDING_SUBMISSION
+    ctx.logger.info(f"Submission {submission_id} reset to PENDING_SUBMISSION")
+    return get_view_model(submission)
+
+
+def cancel_data_submission(
+    ctx: ApplicationContext, submission_id: int
+) -> DataSubmissionViewModel:
+    submission = ctx.submissions.get_by_id(submission_id)
+
+    if submission is None:
+        ctx.logger.error(f"Data submission with ID {submission_id} does not exist")
+        return None
+
+    if submission.status == DataSubmissionStatus.VALIDATED:
+        ctx.logger.error(
+            f"Cannot cancel submission {submission_id} - already validated"
+        )
+        return None
+
+    ctx.logger.info(
+        f"Canceling submission {submission_id}: {submission.name} "
+        f"(current status: {submission.status.value})"
+    )
+
+    ctx.submissions.update_status(submission.id, DataSubmissionStatus.CANCELED)
+
+    submission.status = DataSubmissionStatus.CANCELED
+    ctx.logger.info(f"Submission {submission_id} canceled")
+    return get_view_model(submission)
+
+
 def get_data_submissions_by_producer(
     ctx: ApplicationContext, producer_name: str
 ) -> List[DataSubmissionViewModel]:
@@ -50,50 +99,35 @@ def get_data_submissions_by_producer(
 
 
 def validate_data_submission(
-    ctx: ApplicationContext, file_path: str, column_map_name: str
-):
-    submission = ctx.submissions.get_by_file_path(file_path)
-    if not submission:
-        ctx.logger.error("Data submission with that filename does not exist")
-        return
+     ctx: ApplicationContext, file_path: str, column_map_name: str
+ ):
+     ctx.logger.info("DEBUG: validate_data_submission STARTED")
+     submission = ctx.submissions.get_by_file_path(file_path)
+     if not submission:
+         ctx.logger.error("Data submission with that filename does not exist")
+         return
 
-    download_result: DownloadResult = ctx.storage.download_temp(file_path)
-    if not download_result:
-        ctx.logger.error("Data extration error")
-        return
+     column_map = submission.column_map
+     if column_map is None:
+         ctx.logger.error("Column map not found on submission")
+         return
 
-    column_map = ctx.column_maps.get_by_name_and_version(column_map_name, 1)
-    if column_map is None:
-        ctx.logger.error("Column map not found")
-        return
+     mapped_data_dir = submission.get_mapped_data_dir(file_path, LANDING_ZONE)
+     mapped_data_remote_dir = submission.get_mapped_data_dir(file_path, LANDING_ZONE, True)
 
-    # Using version 1 for column maps for now, may add feature for user to select
-    # version later
-    try:
-        mapped_data_local_dir = submission.get_mapped_data_dir(
-            download_result.extracted_dir, LANDING_ZONE
-        )
-        mapped_data_remote_dir = submission.get_mapped_data_dir(
-            download_result.extracted_dir, LANDING_ZONE, True
-        )
-        report = ctx.task_queue.run_load_and_validate(
-            ctx.submissions,
-            submission.id,
-            download_result.extracted_dir,
-            column_map.mapping,
-            mapped_data_local_dir,
-        )
-        _ = ctx.task_queue.run_copy_mapped_data_to_remote(
-            mapped_data_local_dir,
-            mapped_data_remote_dir,
-        )
-
-        ctx.logger.info(f"Total number of features: {report.overview.feature_count}")
-    except Exception:
-        raise
-    finally:
-        ctx.storage.cleanup_temp_dir(download_result.temp_dir)
-        ctx.storage.cleanup_temp_dir(mapped_data_local_dir)
+     ctx.logger.info("DEBUG: Calling run_load_and_validate")
+     ctx.task_queue.run_load_and_validate(
+         ctx.submissions,
+         submission.id,
+         file_path,
+         column_map.mapping,
+         mapped_data_dir,
+     )
+     _ = ctx.task_queue.run_copy_mapped_data_to_remote(
+         mapped_data_dir,
+         mapped_data_remote_dir,
+     )
+     ctx.submissions.update_status(submission.id, DataSubmissionStatus.PENDING_VALIDATION)
 
 
 def validate_file_before_submission(
@@ -123,6 +157,55 @@ def validate_file_before_submission(
         )
 
     return True
+
+
+def retry_data_submission(
+    ctx: ApplicationContext, submission_id: int
+) -> DataSubmissionViewModel:
+    submission = ctx.submissions.get_by_id(submission_id)
+
+    if submission is None:
+        ctx.logger.error(f"Data submission with ID {submission_id} does not exist")
+        return None
+
+    if submission.status != DataSubmissionStatus.PENDING_SUBMISSION:
+        ctx.logger.error(
+            f"Submission {submission_id} is in '{submission.status.value}' status. "
+            f"Can only retry submissions in 'PENDING_SUBMISSION' status."
+        )
+        return None
+
+    ctx.logger.info(
+        f"Retrying submission {submission_id}: {submission.name} "
+        f"(file: {submission.file_path})"
+    )
+
+    column_map = submission.column_map
+    if column_map is None:
+        ctx.logger.error("Column map not found on submission")
+        return None
+
+    mapped_data_dir = submission.get_mapped_data_dir(
+        submission.file_path, LANDING_ZONE
+    )
+
+    ctx.logger.info("DEBUG: Calling run_load_and_validate")
+    ctx.task_queue.run_load_and_validate(
+        ctx.submissions,
+        submission.id,
+        submission.file_path,
+        column_map.mapping,
+        mapped_data_dir,
+    )
+
+    ctx.submissions.update_status(
+        submission.id, DataSubmissionStatus.PENDING_VALIDATION
+    )
+
+    ctx.logger.info(
+        f"Submission {submission_id} retry initiated, status updated to PENDING_VALIDATION"
+    )
+    return get_view_model(submission)
 
 
 def create_data_submission(

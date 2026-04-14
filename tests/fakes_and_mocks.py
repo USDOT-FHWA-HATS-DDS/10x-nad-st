@@ -123,6 +123,13 @@ class FakeColumnMapRepository(ColumnMapRepository):
         self._column_maps.add(column_map)
         return column_map
 
+    def delete(self, id: int) -> bool:
+        column_map = next((cm for cm in self._column_maps if cm.id == id), None)
+        if column_map:
+            self._column_maps.remove(column_map)
+            return True
+        return False
+
     def remove(self, column_map: ColumnMap) -> None:
         self._column_maps.remove(column_map)
 

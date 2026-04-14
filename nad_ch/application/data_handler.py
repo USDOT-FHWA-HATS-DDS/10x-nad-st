@@ -69,23 +69,19 @@ class DataHandler(object):
     def read_file_in_batches(
         self, path: str, table_name: Optional[str] = None, batch_size: int = 100000
     ) -> Iterator[GeoDataFrame]:
-        # TODO: Modify to return a joined table; for cases where 1 or more tables
-        # are needed to get all fields from source file.
         if table_name and table_name not in [layer[0] for layer in pyogrio.list_layers(path)]:
             raise Exception(f"Table name {table_name} does not exist")
-        i = 0
-        while True:
-            gdf = read_file(path, rows=slice(i, i + batch_size))
-            if gdf.shape[0] == 0:
-                if self.mapped_data_dir:
-                    # No more batches to process, create zip file
-                    self.__zip_mapped_data()
-                break
-            gdf = self.__rename_columns(gdf)
-            if self.mapped_data_dir:
-                self.__write_mapped_batch(gdf, i == 0)
-            yield gdf
-            i += batch_size
+
+        gdf = read_file(path)
+        if gdf.shape[0] == 0:
+            return
+
+        gdf = self.__rename_columns(gdf)
+        if self.mapped_data_dir:
+            os.makedirs(self.mapped_data_dir, exist_ok=True)
+            self.__write_mapped_batch(gdf, True)
+
+        yield gdf
 
     def __write_mapped_batch(self, gdf: GeoDataFrame, first_batch: bool):
         write_mode = "a"
@@ -93,14 +89,19 @@ class DataHandler(object):
             write_mode = "w"
             os.makedirs(self.mapped_data_dir, exist_ok=True)
         try:
+            os.environ["SHAPE_RESTORE_SHX"] = "YES"
             gdf.to_file(
                 filename=self.mapped_data_path,
                 index=False,
                 mode=write_mode,
                 engine="pyogrio",
             )
-        except Exception:
-            shutil.rmtree(self.mapped_data_dir)
+        except Exception as e:
+            if os.path.exists(self.mapped_data_dir):
+                try:
+                    shutil.rmtree(self.mapped_data_dir)
+                except Exception:
+                    pass
             raise
 
     def __zip_mapped_data(self):

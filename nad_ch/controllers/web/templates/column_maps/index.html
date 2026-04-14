@@ -1,6 +1,92 @@
 {% extends "_layouts/base.html" %} {% block title %}Mappings{% endblock %} {%
-from "components/page-header.html" import page_header %} {% block content %} {{
-page_header("Mappings") }} {% if not column_maps %}
+from "components/page-header.html" import page_header %}
+{% from "components/icons/eye.html" import eye %}
+{% block content %}
+<style>
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #71767a;
+  border-radius: 4px;
+  background: white;
+  color: #71767a;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+.action-btn:hover {
+  background: #e6e6e6;
+  border-color: #71767a;
+}
+.action-btn:focus {
+  outline: 2px solid #71767a;
+  outline-offset: 2px;
+}
+.action-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.action-btn--danger {
+  color: #b50909;
+}
+.action-btn--danger:hover {
+  background: #fff3f3;
+  border-color: #b50909;
+}
+</style>
+{{ page_header("Mappings") }}
+
+<div class="display-flex flex-justify flex-align-end padding-bottom-2">
+  <a
+    href="#mapping-modal"
+    class="usa-button"
+    aria-controls="mapping-modal"
+    data-open-modal
+    >Create mapping</a
+  >
+</div>
+
+{% if column_maps %}
+<div class="usa-table-default width-full">
+  <table class="usa-table usa-table--borderless width-full">
+    <thead class="bg-base-lighter border-bottom-2px border-base-light">
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Created</th>
+        <th scope="col">Updated</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cm in column_maps %}
+      <tr>
+        <th class="border-bottom-1px border-base-lightest" scope="row">
+          {{ cm.name }}
+        </th>
+        <td>{{ cm.date_created }}</td>
+        <td>{{ cm.date_updated }}</td>
+        <td>
+          <a href="{{ url_for('column_maps.show', id=cm.id, _external=True) }}"
+            class="action-btn"
+            title="View mapping">
+            {{ eye() }}
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
 <div class="usa-card padding-top-2 grid-col-4">
   <div class="usa-card__container">
     <div class="usa-card__header">
@@ -20,17 +106,9 @@ page_header("Mappings") }} {% if not column_maps %}
         address data seamlessly.
       </p>
     </div>
-    <div class="usa-card__footer">
-      <a
-        href="#mapping-modal"
-        class="usa-button"
-        aria-controls="mapping-modal"
-        data-open-modal
-        >Create mapping</a
-      >
-    </div>
   </div>
 </div>
+{% endif %}
 
 <div
   class="usa-modal"
@@ -83,33 +161,4 @@ page_header("Mappings") }} {% if not column_maps %}
     </div>
   </div>
 </div>
-{% else %}
-<div class="usa-table-default width-full">
-  <table class="usa-table usa-table--borderless width-full">
-    <thead class="bg-base-lighter border-bottom-2px border-base-light">
-      <tr>
-        <th scope="col">Name</th>
-        <th scope="col">Created</th>
-        <th scope="col">Updated</th>
-        <th scope="col"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for cm in column_maps %}
-      <tr>
-        <th class="border-bottom-1px border-base-lightest" scope="row">
-          {{ cm.name }}
-        </th>
-        <td>{{ cm.date_created }}</td>
-        <td>{{ cm.date_updated }}</td>
-        <td>
-          <a href="{{ url_for('column_maps.show', id=cm.id, _external=True) }}"
-            >View</a
-          >
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %} {% endblock %}
+{% endblock %}

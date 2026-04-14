@@ -94,8 +94,8 @@ class ColumnMap(Entity):
         "Add_Number",
         "St_Name",
         "St_PosTyp",
-        "Unit",
-        "Inc_Muni",
+        # "Unit",
+        # "Inc_Muni",
         "Post_City",
         # "DataSet_ID",  # TODO: WY_Crook_221014 mapping file is missing this field.
     ]
@@ -118,10 +118,14 @@ class ColumnMap(Entity):
         return f"ColumnMap {self.id}, {self.name})"
 
     def is_valid(self) -> bool:
-        return all(
-            field in self.mapping and self.mapping[field] not in (None, "")
+        return len(self.get_invalid_fields()) == 0
+
+    def get_invalid_fields(self) -> list[str]:
+        return [
+            field
             for field in ColumnMap.required_fields
-        )
+            if field not in self.mapping or self.mapping[field] in (None, "")
+        ]
 
 
 class DataSubmissionStatus(Enum):

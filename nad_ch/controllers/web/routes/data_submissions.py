@@ -20,6 +20,9 @@ from nad_ch.application.use_cases.data_submissions import (
     get_data_submission,
     get_data_submissions_by_producer,
     create_data_submission,
+    retry_data_submission,
+    reset_data_submission,
+    cancel_data_submission,
     validate_file_before_submission,
 )
 
@@ -187,3 +190,30 @@ def edit(id):
 def view_report_json(submission_id):
     view_model = get_data_submission(g.ctx, submission_id)
     return jsonify(view_model.report)
+
+
+@submissions_bp.route("/api/submissions/<submission_id>/retry", methods=["POST"])
+@login_required
+def api_retry_submission(submission_id):
+    view_model = retry_data_submission(g.ctx, int(submission_id))
+    if view_model:
+        return jsonify({"success": True, "submission": view_model.__dict__})
+    return jsonify({"success": False, "error": "Failed to retry submission"}), 400
+
+
+@submissions_bp.route("/api/submissions/<submission_id>/reset", methods=["POST"])
+@login_required
+def api_reset_submission(submission_id):
+    view_model = reset_data_submission(g.ctx, int(submission_id))
+    if view_model:
+        return jsonify({"success": True, "submission": view_model.__dict__})
+    return jsonify({"success": False, "error": "Failed to reset submission"}), 400
+
+
+@submissions_bp.route("/api/submissions/<submission_id>/cancel", methods=["POST"])
+@login_required
+def api_cancel_submission(submission_id):
+    view_model = cancel_data_submission(g.ctx, int(submission_id))
+    if view_model:
+        return jsonify({"success": True, "submission": view_model.__dict__})
+    return jsonify({"success": False, "error": "Failed to cancel submission"}), 400
