@@ -67,6 +67,21 @@ from "components/icons/eye.html" import eye %}
     </div>
   </div>
 </header>
+<div class="grid-container padding-y-2">
+  <div class="usa-checkbox">
+    <input
+      class="usa-checkbox__input"
+      id="show-cancelled"
+      type="checkbox"
+      name="show-cancelled"
+      {% if show_cancelled %}checked{% endif %}
+      onchange="window.location.href = window.location.pathname + '?show_cancelled=' + this.checked"
+    />
+    <label class="usa-checkbox__label" for="show-cancelled">
+      Show Canceled submissions
+    </label>
+  </div>
+</div>
 
 {% if submissions %}
 <div x-data="SubmissionActions()">

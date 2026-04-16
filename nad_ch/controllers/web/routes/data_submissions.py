@@ -38,11 +38,21 @@ def before_request():
 @submissions_bp.route("/data-submissions")
 @login_required
 def index():
+    from flask import request
     try:
+        show_cancelled = request.args.get("show_cancelled", "false").lower() == "true"
         view_models = get_data_submissions_by_producer(
             g.ctx, current_user.producer.name
         )
-        return render_template("data_submissions/index.html", submissions=view_models)
+
+        if not show_cancelled:
+            view_models = [v for v in view_models if v.status != "Canceled"]
+
+        return render_template(
+            "data_submissions/index.html",
+            submissions=view_models,
+            show_cancelled=show_cancelled
+        )
     except ValueError:
         abort(404)
 
