@@ -60,14 +60,8 @@ class DataValidator:
         )
 
     def get_invalid_record_count(self, gdf: GeoDataFrame) -> int:
-        existing_required_fields = list(self.valid_mappings.values())
-        filters = [
-            f"(gdf['{field}'].isin({self.report_features[field].invalid_domains}))"
-            for field in existing_required_fields
-            if self.report_features[field].invalid_domains
-        ]
-        filters.append(f"(gdf[{existing_required_fields}].isna().any(axis=1))")
-        return len(gdf[eval("|".join(filters))])
+        valid_mask = self._get_valid_record_mask(gdf)
+        return len(gdf[~valid_mask])
 
     def initialize_overview_details(
         self, gdf: GeoDataFrame, column_map: Dict[str, str]

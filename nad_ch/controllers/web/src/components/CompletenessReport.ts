@@ -100,10 +100,13 @@ export function CompletenessReport(
     },
     getStatusTagClass(status: string): string {
       switch (status) {
+        case 'Populated':
         case 'No error':
           return 'usa-tag__success';
+        case 'Partially Populated':
         case 'Updated by calculation':
           return 'usa-tag__warning';
+        case 'Empty':
         case 'Rejected':
           return 'usa-tag__error';
         default:

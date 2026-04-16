@@ -154,21 +154,27 @@ def create_data_submission_vm(submission: DataSubmission) -> DataSubmissionViewM
 def enrich_report(report: dict) -> dict:
     overview = report.get("overview", {})
     total_records = overview.get("records_count", 0)
-    flagged_records = overview.get("records_flagged", 0)
-    valid_records = max(total_records - flagged_records, 0)
 
     for feature in report.get("features", []):
         null_count = feature.get("null_count", 0)
-        valid_populated = feature.get("valid_populated_count", 0)
+        populated_count = feature.get("populated_count", 0)
 
-        if valid_records > 0:
-            percent_populated = (valid_populated / valid_records) * 100
-            percent_empty = (null_count / valid_records) * 100
+        if total_records > 0:
+            percent_populated = (populated_count / total_records) * 100
+            percent_empty = (null_count / total_records) * 100
         else:
             percent_populated, percent_empty = 0.0, 0.0
 
         feature["populated_percentage"] = present_percentage(percent_populated)
         feature["null_percentage"] = present_percentage(percent_empty)
+
+        # Set status
+        if populated_count == 0:
+            feature["status"] = "Empty"
+        elif populated_count == total_records:
+            feature["status"] = "Populated"
+        else:
+            feature["status"] = "Partially Populated"
 
     return report
 
