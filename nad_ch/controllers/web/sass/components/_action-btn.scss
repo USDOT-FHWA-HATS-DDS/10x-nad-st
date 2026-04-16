@@ -1,0 +1,45 @@
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--usa-base-dark) 30%, transparent);
+  border-radius: 4px;
+  background: white;
+  color: var(--usa-base-dark);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+
+  &:hover {
+    background: color-mix(in srgb, var(--usa-base-dark) 10%, white);
+    border-color: var(--usa-base-dark);
+  }
+
+  &:focus {
+    outline: 2px solid var(--usa-base-dark);
+    outline-offset: 2px;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  &--danger {
+    color: #b50909;
+
+    &:hover {
+      background: #fff3f3;
+      border-color: #b50909;
+    }
+  }
+}
