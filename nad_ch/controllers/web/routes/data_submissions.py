@@ -57,6 +57,44 @@ def show(id):
         abort(404)
 
 
+@submissions_bp.route("/data-submissions/<id>/download")
+@login_required
+def download_mapped_data(id):
+    from flask import Response, current_app, request
+    try:
+        view_model = get_data_submission(g.ctx, id)
+        format = request.args.get("format", "shp")
+
+        if format == "gdb":
+            path = view_model.mapped_data_gdb_path
+        else:
+            path = view_model.mapped_data_path
+
+        current_app.logger.info(f"Download request for submission {id}, format: {format}, path: {path}")
+
+        if not path:
+            current_app.logger.error(f"No path for submission {id}, format {format}")
+            abort(404)
+
+        file_data = g.ctx.storage.download_file(path)
+        if not file_data:
+            current_app.logger.error(f"Failed to download file: {path}")
+            abort(404)
+
+        filename = path.split("/")[-1]
+        return Response(
+            file_data,
+            mimetype="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(len(file_data)),
+            },
+        )
+    except Exception as e:
+        current_app.logger.error(f"Download error: {e}")
+        abort(404)
+
+
 @submissions_bp.route("/data-submissions/create")
 @login_required
 def create():

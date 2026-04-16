@@ -49,7 +49,8 @@ def load_and_validate(
     file_path: str,
     column_map: Dict[str, str],
     mapped_data_dir: str,
-) -> Any:
+    mapped_data_remote_dir: str,
+) -> dict:
     import os
     os.environ["SHAPE_RESTORE_SHX"] = "YES"
 
@@ -76,6 +77,9 @@ def load_and_validate(
                 data_validator = DataValidator(data_handler.valid_renames)
             data_validator.run(gdf)
 
+        zip_file_path, gdb_zip_file_path = data_handler.finalize()
+        app_context.logger.info(f"Created zip files: {zip_file_path}, {gdb_zip_file_path}")
+
         data_validator.finalize_overview_details()
         report = DataSubmissionReport(
             data_validator.report_overview,
@@ -86,7 +90,14 @@ def load_and_validate(
         app_context.submissions.update_report(submission_id, report_dict)
         app_context.logger.info(f"Task load_and_validate completed for submission {submission_id}. Batches: {batch_count}")
 
-        return report_dict
+        return {
+            "submission_id": submission_id,
+            "mapped_data_dir": mapped_data_dir,
+            "mapped_data_remote_dir": mapped_data_remote_dir,
+            "zip_file_path": zip_file_path,
+            "gdb_zip_file_path": gdb_zip_file_path,
+            "report": report_dict
+        }
     except Exception as e:
         app_context.logger.error(f"Task load_and_validate failed for submission {submission_id}: {e}")
         try:
@@ -108,33 +119,51 @@ def load_and_validate(
 
 
 @celery_app.task(bind=True, max_retries=2)
-def copy_mapped_data_to_remote(
-    self, mapped_data_local_dir: str, mapped_data_remote_dir: str
-) -> bool:
+def copy_mapped_data_to_remote(self, result: dict) -> str:
+    submission_id = result["submission_id"]
+    mapped_data_local_dir = result["mapped_data_dir"]
+    mapped_data_remote_dir = result["mapped_data_remote_dir"]
+    zip_file_path = result.get("zip_file_path")
+    gdb_zip_file_path = result.get("gdb_zip_file_path")
+    mapped_data_path = None
+    mapped_data_gdb_path = None
     try:
-        success = True
         app_context = TaskHelperFunctions.get_app_context_instance()
         storage_interface = app_context.create_storage()
         filename = mapped_data_remote_dir.split("/")[-1]
-        timestamp = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H%M%S")
-        # Copy mapped dataset to remote storage
-        storage_interface.upload(
-            os.path.join(mapped_data_local_dir, f"{filename}.zip"),
-            os.path.join(mapped_data_remote_dir, f"{filename}_{timestamp}.zip"),
-        )
+        timestamp = datetime.now(timezone.utc).strftime("%Y_%m_%d_%H%M_%S")
+        mapped_data_path = os.path.join(mapped_data_remote_dir, f"{filename}_{timestamp}.zip")
+        mapped_data_gdb_path = os.path.join(mapped_data_remote_dir, f"{filename}_{timestamp}_gdb.zip")
+
+        if not zip_file_path or not os.path.exists(zip_file_path):
+            app_context.logger.error(f"Zip file does not exist: {zip_file_path}")
+            raise Exception(f"Zip file does not exist: {zip_file_path}")
+
+        app_context.logger.info(f"Uploading {zip_file_path} to {mapped_data_path}")
+        upload_success = storage_interface.upload(zip_file_path, mapped_data_path)
+        if upload_success is None or upload_success is False:
+            raise Exception(f"Failed to upload {zip_file_path} to {mapped_data_path}")
+
+        if gdb_zip_file_path and os.path.exists(gdb_zip_file_path):
+            app_context.logger.info(f"Uploading {gdb_zip_file_path} to {mapped_data_gdb_path}")
+            upload_gdb_success = storage_interface.upload(gdb_zip_file_path, mapped_data_gdb_path)
+            if upload_gdb_success:
+                app_context.submissions.update_mapped_data_gdb_path(submission_id, mapped_data_gdb_path)
+
+        app_context.submissions.update_mapped_data_path(submission_id, mapped_data_path)
+        app_context.logger.info(f"Successfully uploaded mapped data to {mapped_data_path}")
     except Exception as e:
+        app_context.logger.error(f"Failed to copy mapped data to remote: {e}")
         raise self.retry(exc=e, countdown=30)
     finally:
-        # Clean up temporary directory after processing
         if mapped_data_local_dir and os.path.exists(mapped_data_local_dir):
             import shutil
             try:
                 shutil.rmtree(mapped_data_local_dir)
             except Exception as e:
-                # Log cleanup error but don't fail the task
                 app_context = TaskHelperFunctions.get_app_context_instance()
                 app_context.logger.warning(f"Failed to cleanup temp dir {mapped_data_local_dir}: {e}")
-    return success
+    return f"SHP: {mapped_data_path}, GDB: {mapped_data_gdb_path}"
 
 
 class CeleryTaskQueue(TaskQueue):
@@ -156,12 +185,34 @@ class CeleryTaskQueue(TaskQueue):
 
     def run_copy_mapped_data_to_remote(
         self,
+        submission_id: int,
         mapped_data_dir: str,
         mapped_data_remote_dir: str,
     ):
+        result = {
+            "submission_id": submission_id,
+            "mapped_data_dir": mapped_data_dir,
+        }
         copy_mapped_data_to_remote.apply_async(
-            args=[mapped_data_dir, mapped_data_remote_dir]
+            args=[result, mapped_data_remote_dir]
         )
+        return True
+
+    def run_load_and_validate_then_copy(
+        self,
+        submission_id: int,
+        file_path: str,
+        column_map: Dict[str, str],
+        mapped_data_dir: str,
+        mapped_data_remote_dir: str,
+    ):
+        from celery import chain
+        app_context = TaskHelperFunctions.get_app_context_instance()
+        app_context.logger.info("DEBUG: Chaining load_and_validate then copy_mapped_data_to_remote")
+        chain(
+            load_and_validate.s(submission_id, file_path, column_map, mapped_data_dir, mapped_data_remote_dir),
+            copy_mapped_data_to_remote.s()
+        ).apply_async()
         return True
 
 

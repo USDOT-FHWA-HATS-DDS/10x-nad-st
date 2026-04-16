@@ -108,6 +108,8 @@ class DataSubmissionModel(CommonBase):
     data_producer_id = Column(Integer, ForeignKey("data_producers.id"), nullable=False)
     column_map_id = Column(Integer, ForeignKey("column_maps.id"), nullable=False)
     report = Column(JSON)
+    mapped_data_path = Column(String, nullable=True)
+    mapped_data_gdb_path = Column(String, nullable=True)
 
     data_producer = relationship("DataProducerModel", back_populates="data_submissions")
     column_map = relationship("ColumnMapModel", back_populates="data_submissions")
@@ -121,6 +123,8 @@ class DataSubmissionModel(CommonBase):
             report=submission.report,
             data_producer_id=producer_id,
             column_map_id=column_map_id,
+            mapped_data_path=submission.mapped_data_path,
+            mapped_data_gdb_path=submission.mapped_data_gdb_path,
         )
         return model
 
@@ -135,6 +139,8 @@ class DataSubmissionModel(CommonBase):
             report=self.report,
             producer=producer,
             column_map=column_map,
+            mapped_data_path=self.mapped_data_path,
+            mapped_data_gdb_path=self.mapped_data_gdb_path,
         )
 
         if self.created_at is not None:
@@ -340,6 +346,38 @@ class SqlAlchemyDataSubmissionRepository(DataSubmissionRepository):
             if submission_model:
                 submission_model.report = report
                 submission_model.status = DataSubmissionStatus.VALIDATED
+                session.commit()
+                session.refresh(submission_model)
+                return submission_model.to_entity()
+            else:
+                return None
+
+    def update_mapped_data_path(self, id: int, mapped_data_path: str) -> None:
+        with session_scope(self.session_factory) as session:
+            submission_model = (
+                session.query(DataSubmissionModel)
+                .filter(DataSubmissionModel.id == id)
+                .first()
+            )
+
+            if submission_model:
+                submission_model.mapped_data_path = mapped_data_path
+                session.commit()
+                session.refresh(submission_model)
+                return submission_model.to_entity()
+            else:
+                return None
+
+    def update_mapped_data_gdb_path(self, id: int, mapped_data_gdb_path: str) -> None:
+        with session_scope(self.session_factory) as session:
+            submission_model = (
+                session.query(DataSubmissionModel)
+                .filter(DataSubmissionModel.id == id)
+                .first()
+            )
+
+            if submission_model:
+                submission_model.mapped_data_gdb_path = mapped_data_gdb_path
                 session.commit()
                 session.refresh(submission_model)
                 return submission_model.to_entity()

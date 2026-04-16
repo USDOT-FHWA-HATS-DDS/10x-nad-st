@@ -108,6 +108,10 @@ class DataSubmissionViewModel(ViewModel):
     producer_name: str
     file_path: str
     report: str
+    column_map_name: str
+    column_map_version: int
+    mapped_data_path: str
+    mapped_data_gdb_path: str
 
 
 def create_data_submission_vm(submission: DataSubmission) -> DataSubmissionViewModel:
@@ -140,14 +144,28 @@ def create_data_submission_vm(submission: DataSubmission) -> DataSubmissionViewM
         producer_name=submission.producer.name,
         file_path=submission.file_path,
         report=report_json,
+        column_map_name=submission.column_map.name,
+        column_map_version=submission.column_map.version_id,
+        mapped_data_path=submission.mapped_data_path or "",
+        mapped_data_gdb_path=submission.mapped_data_gdb_path or "",
     )
 
 
 def enrich_report(report: dict) -> dict:
+    overview = report.get("overview", {})
+    total_records = overview.get("records_count", 0)
+    flagged_records = overview.get("records_flagged", 0)
+    valid_records = max(total_records - flagged_records, 0)
+
     for feature in report.get("features", []):
-        percent_populated, percent_empty = calculate_percentages(
-            feature.get("populated_count"), feature.get("null_count")
-        )
+        null_count = feature.get("null_count", 0)
+        valid_populated = feature.get("valid_populated_count", 0)
+
+        if valid_records > 0:
+            percent_populated = (valid_populated / valid_records) * 100
+            percent_empty = (null_count / valid_records) * 100
+        else:
+            percent_populated, percent_empty = 0.0, 0.0
 
         feature["populated_percentage"] = present_percentage(percent_populated)
         feature["null_percentage"] = present_percentage(percent_empty)

@@ -23,6 +23,8 @@ class Storage(Protocol):
 
     def download_temp(self, key: str) -> Optional[DownloadResult]: ...
 
+    def download_file(self, key: str) -> Optional[bytes]: ...
+
     def cleanup_temp_dir(self, temp_dir: str) -> bool: ...
 
 
@@ -33,6 +35,23 @@ class TaskQueue(Protocol):
         submission_id: int,
         path: str,
         column_map: Dict[str, str],
+        mapped_data_dir: str,
+    ): ...
+
+    def run_copy_mapped_data_to_remote(
+        self,
+        submission_id: int,
+        mapped_data_dir: str,
+        mapped_data_remote_dir: str,
+    ): ...
+
+    def run_load_and_validate_then_copy(
+        self,
+        submission_id: int,
+        file_path: str,
+        column_map: Dict[str, str],
+        mapped_data_dir: str,
+        mapped_data_remote_dir: str,
     ): ...
 
 

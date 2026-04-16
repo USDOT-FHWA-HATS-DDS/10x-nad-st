@@ -42,26 +42,57 @@
   </header>
 
   {% if submission %}
+  <div class="grid-container padding-left-2 padding-top-2">
+    <div class="display-flex flex-gap-2">
+      {% if submission.mapped_data_path %}
+      <a href="/data-submissions/{{ submission.id }}/download?format=shp" class="usa-button">
+        <svg class="usa-icon" aria-hidden="true" role="img"><use xlink:href="/static/img/sprite.svg#file_download"></use></svg>
+        Download Mapped Data (SHP)
+      </a>
+      {% endif %}
+      {% if submission.mapped_data_gdb_path %}
+      <a href="/data-submissions/{{ submission.id }}/download?format=gdb" class="usa-button">
+        <svg class="usa-icon" aria-hidden="true" role="img"><use xlink:href="/static/img/sprite.svg#file_download"></use></svg>
+        Download Mapped Data (GDB)
+      </a>
+      {% endif %}
+    </div>
+  </div>
   <div id="report-summary-section" x-show="showSummary">
     <div class="grid-container padding-left-0">
       <div class="grid-row padding-top-2">
         <p>
-          New Jersy submitted MorrisCounty2024B to US DOT Schema version 3.0
-          04/2023. Data was extracted from 1 file.
+          {{ submission.producer_name }} submitted {{ submission.name }} to US DOT Schema version {{ submission.column_map_version }}<br>
+          {{ submission.date_created }}<br>
+	  Data was extracted from 1 file.
         </p>
       </div>
       <div class="grid-row">
         <div class="grid-col">
-          <h3>{{ submission.report.overview.feature_count }}</h3>
+          <h3>{{ submission.report.overview.records_count }}</h3>
           <p>Total records submitted</p>
         </div>
         <div class="grid-col">
-          <h3>{{ submission.report.overview.feature_count }}</h3>
+          <h3>{{ submission.report.overview.records_count - submission.report.overview.records_flagged }}</h3>
           <p>Records added to NAD</p>
         </div>
         <div class="grid-col">
-          <h3>{{ submission.report.overview.features_flagged }}</h3>
+          <h3>{{ submission.report.overview.records_flagged }}</h3>
           <p>Records flagged</p>
+        </div>
+      </div>
+      <div class="grid-row">
+        <div class="grid-col">
+          <h3>{{ submission.report.overview.feature_count }}</h3>
+          <p>Fields validated</p>
+        </div>
+        <div class="grid-col">
+          <h3>{{ submission.report.overview.feature_count - submission.report.overview.features_flagged }}</h3>
+          <p>Fields valid</p>
+        </div>
+        <div class="grid-col">
+          <h3>{{ submission.report.overview.features_flagged }}</h3>
+          <p>Fields flagged</p>
         </div>
       </div>
       <div class="grid-row">
@@ -155,7 +186,7 @@
                     <br />
                     <span
                       class="font-mono-3xs"
-                      x-text="feature.populated_count"
+                      x-text="feature.valid_populated_count"
                     ></span>
                   </td>
                 </tr>
@@ -221,7 +252,7 @@
                     <br />
                     <span
                       class="font-mono-3xs"
-                      x-text="feature.populated_count"
+                      x-text="feature.valid_populated_count"
                     ></span>
                   </td>
                 </tr>

@@ -18,6 +18,7 @@ type Feature = {
   nad_feature_name: string;
   populated_count: number;
   null_count: number;
+  valid_populated_count: number;
   required: boolean;
   status: string;
   populated_percentage: string;

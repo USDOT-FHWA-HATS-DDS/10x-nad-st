@@ -1,8 +1,8 @@
 version: "3.8"
 services:
   web:
-    container_name: nad-ch-dev-local
-    image: nad-ch-dev-local
+    container_name: nadst
+    image: nadst-dev
     ports:
       - "8080:5000"
     depends_on:

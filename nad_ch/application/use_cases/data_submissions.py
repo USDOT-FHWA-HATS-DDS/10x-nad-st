@@ -99,35 +99,31 @@ def get_data_submissions_by_producer(
 
 
 def validate_data_submission(
-     ctx: ApplicationContext, file_path: str, column_map_name: str
- ):
-     ctx.logger.info("DEBUG: validate_data_submission STARTED")
-     submission = ctx.submissions.get_by_file_path(file_path)
-     if not submission:
-         ctx.logger.error("Data submission with that filename does not exist")
-         return
+    ctx: ApplicationContext, file_path: str, column_map_name: str
+):
+    ctx.logger.info("DEBUG: validate_data_submission STARTED")
+    submission = ctx.submissions.get_by_file_path(file_path)
+    if not submission:
+        ctx.logger.error("Data submission with that filename does not exist")
+        return
 
-     column_map = submission.column_map
-     if column_map is None:
-         ctx.logger.error("Column map not found on submission")
-         return
+    column_map = submission.column_map
+    if column_map is None:
+        ctx.logger.error("Column map not found on submission")
+        return
 
-     mapped_data_dir = submission.get_mapped_data_dir(file_path, LANDING_ZONE)
-     mapped_data_remote_dir = submission.get_mapped_data_dir(file_path, LANDING_ZONE, True)
+    mapped_data_dir = submission.get_mapped_data_dir(file_path, LANDING_ZONE)
+    mapped_data_remote_dir = submission.get_mapped_data_dir(file_path, LANDING_ZONE, True)
 
-     ctx.logger.info("DEBUG: Calling run_load_and_validate")
-     ctx.task_queue.run_load_and_validate(
-         ctx.submissions,
-         submission.id,
-         file_path,
-         column_map.mapping,
-         mapped_data_dir,
-     )
-     _ = ctx.task_queue.run_copy_mapped_data_to_remote(
-         mapped_data_dir,
-         mapped_data_remote_dir,
-     )
-     ctx.submissions.update_status(submission.id, DataSubmissionStatus.PENDING_VALIDATION)
+    ctx.logger.info("DEBUG: Chaining load_and_validate and copy_mapped_data_to_remote")
+    ctx.task_queue.run_load_and_validate_then_copy(
+        submission.id,
+        file_path,
+        column_map.mapping,
+        mapped_data_dir,
+        mapped_data_remote_dir,
+    )
+    ctx.submissions.update_status(submission.id, DataSubmissionStatus.PENDING_VALIDATION)
 
 
 def validate_file_before_submission(
@@ -188,14 +184,17 @@ def retry_data_submission(
     mapped_data_dir = submission.get_mapped_data_dir(
         submission.file_path, LANDING_ZONE
     )
+    mapped_data_remote_dir = submission.get_mapped_data_dir(
+        submission.file_path, LANDING_ZONE, True
+    )
 
-    ctx.logger.info("DEBUG: Calling run_load_and_validate")
-    ctx.task_queue.run_load_and_validate(
-        ctx.submissions,
+    ctx.logger.info("DEBUG: Chaining load_and_validate and copy_mapped_data_to_remote")
+    ctx.task_queue.run_load_and_validate_then_copy(
         submission.id,
         submission.file_path,
         column_map.mapping,
         mapped_data_dir,
+        mapped_data_remote_dir,
     )
 
     ctx.submissions.update_status(

@@ -87,17 +87,35 @@ class DataValidator:
                 for provided_name, nad_name in column_map.items()
             }
 
+    def _get_valid_record_mask(self, gdf: GeoDataFrame) -> GeoDataFrame:
+        existing_required_fields = list(self.valid_mappings.values())
+        valid_fields = [f for f in existing_required_fields if f in gdf.columns]
+
+        has_null = gdf[valid_fields].isna().any(axis=1)
+
+        has_invalid_domain = False
+        for field in existing_required_fields:
+            field_invalid_domains = self.report_features[field].invalid_domains
+            if field_invalid_domains:
+                has_invalid_domain = has_invalid_domain | gdf[field].isin(field_invalid_domains)
+
+        return ~(has_null | has_invalid_domain)
+
     def update_feature_details(self, gdf: GeoDataFrame):
+        valid_mask = self._get_valid_record_mask(gdf)
+        gdf_valid = gdf[valid_mask]
+
         for column in gdf.columns:
             feature_submission = self.report_features.get(column)
             if feature_submission:
-                # Update null and populated counts
                 populated_count = gdf[column].notna().sum()
                 null_count = gdf[column].isna().sum()
                 feature_submission.populated_count += populated_count
                 feature_submission.null_count += null_count
 
-                # Update invalid domain metrics
+                valid_populated = gdf_valid[column].notna().sum() if len(gdf_valid) > 0 else 0
+                feature_submission.valid_populated_count += valid_populated
+
                 column_domain_dict = self.domains["domain"].get(column)
                 column_mapper_dict = self.domains["mapper"].get(column)
                 if column_domain_dict and column_mapper_dict:
@@ -131,14 +149,12 @@ class DataValidator:
                     )
                     feature_submission.invalid_domain_count += invalid_domain_count
                     feature_submission.valid_domain_count += valid_domain_count
-                    # Can only store up to 100 invalid domains per nad field
                     remaining_slots = 100 - len(feature_submission.invalid_domains)
                     if invalid_domains and remaining_slots > 0:
                         feature_submission.invalid_domains.extend(
                             invalid_domains[:remaining_slots]
                         )
 
-                # Generate frequency table of fields that are domain specific only
                 if column_domain_dict:
                     domain_freq = gdf[column].value_counts().to_dict()
                     if feature_submission.domain_frequency:
@@ -146,11 +162,8 @@ class DataValidator:
                             Counter(feature_submission.domain_frequency)
                             + Counter(domain_freq)
                         )
-                    # Check if the number of unique domains in frequency dictionary
-                    # is 2x greater than maximum expected unique domains
                     if len(domain_freq.keys()) > 2 * len(column_domain_dict.keys()):
                         feature_submission.high_domain_cardinality = True
-                        # Reset domain frequency
                         domain_freq = {}
                     feature_submission.domain_frequency = domain_freq
 

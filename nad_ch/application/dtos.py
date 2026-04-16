@@ -28,9 +28,9 @@ class DataSubmissionReportFeature:
     null_count: int = 0
     invalid_domain_count: int = 0
     valid_domain_count: int = 0
+    valid_populated_count: int = 0
     invalid_domains: List[str] = field(default_factory=list)
     domain_frequency: Dict[str, Dict[str, int]] = field(default_factory=dict)
-    # Set to true when there is too many unexpected domain values found for a field
     high_domain_cardinality: bool = False
 
 

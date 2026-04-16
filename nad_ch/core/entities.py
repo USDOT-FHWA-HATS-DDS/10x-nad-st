@@ -145,6 +145,8 @@ class DataSubmission(Entity):
         producer: DataProducer,
         column_map: ColumnMap,
         report: Optional[Dict[any, any]] = None,
+        mapped_data_path: Optional[str] = None,
+        mapped_data_gdb_path: Optional[str] = None,
         id: Optional[int] = None,
     ):
         super().__init__(id)
@@ -156,6 +158,8 @@ class DataSubmission(Entity):
         self.producer = producer
         self.column_map = column_map
         self.report = report
+        self.mapped_data_path = mapped_data_path
+        self.mapped_data_gdb_path = mapped_data_gdb_path
 
     def __repr__(self):
         return f"DataSubmission \

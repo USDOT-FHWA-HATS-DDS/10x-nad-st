@@ -78,6 +78,8 @@ def get_submission(ctx, submission_id):
         click.echo(f"Status: {submission.status}")
         click.echo(f"File path: {submission.file_path}")
         click.echo(f"Producer: {submission.producer_name}")
+        if submission.mapped_data_path:
+            click.echo(f"Mapped data path: {submission.mapped_data_path}")
     else:
         click.echo(f"Submission {submission_id} not found.")
 

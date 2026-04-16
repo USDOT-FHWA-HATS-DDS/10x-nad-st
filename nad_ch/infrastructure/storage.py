@@ -80,6 +80,18 @@ class S3Storage(Storage):
         except Exception:
             return False
 
+    def download_file(self, key: str) -> Optional[bytes]:
+        try:
+            temp_dir = tempfile.mkdtemp()
+            zip_file_path = os.path.join(temp_dir, key.split("/")[-1])
+            self.client.download_file(self.bucket_name, key, zip_file_path)
+            with open(zip_file_path, "rb") as f:
+                data = f.read()
+            shutil.rmtree(temp_dir)
+            return data
+        except Exception:
+            return None
+
 
 class MinioStorage(S3Storage):
     def __init__(
@@ -102,11 +114,23 @@ class MinioStorage(S3Storage):
 
     def upload(self, source: str, destination: str) -> bool:
         try:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"MinioStorage.upload: source={source}, destination={destination}")
             response = self.client.fput_object(
                 file_path=source, bucket_name=self.bucket_name, object_name=destination
             )
+            logger.info(f"MinioStorage.upload success")
             return response
         except FileNotFoundError:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"MinioStorage.upload: FileNotFoundError - source not found: {source}")
+            return None
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"MinioStorage.upload error: {type(e).__name__}: {e}")
             return None
 
     def create_bucket(self):
@@ -118,7 +142,10 @@ class MinioStorage(S3Storage):
             print("Bucket", self.bucket_name, "already exists")
 
     def download_temp(self, key: str) -> Optional[DownloadResult]:
+        import logging
+        logger = logging.getLogger(__name__)
         try:
+            logger.info(f"MinioStorage.download_temp: key={key}, bucket={self.bucket_name}")
             temp_dir = tempfile.mkdtemp()
             zip_file_path = os.path.join(temp_dir, key)
 
@@ -136,6 +163,19 @@ class MinioStorage(S3Storage):
             ]
             gdb_dir = gdb_dirs[0] if gdb_dirs else None
             return DownloadResult(temp_dir=temp_dir, extracted_dir=gdb_dir)
+        except Exception as e:
+            logger.error(f"MinioStorage.download_temp error: {type(e).__name__}: {e}")
+            return None
+
+    def download_file(self, key: str) -> Optional[bytes]:
+        try:
+            temp_dir = tempfile.mkdtemp()
+            zip_file_path = os.path.join(temp_dir, key.split("/")[-1])
+            self.client.fget_object(self.bucket_name, key, zip_file_path)
+            with open(zip_file_path, "rb") as f:
+                data = f.read()
+            shutil.rmtree(temp_dir)
+            return data
         except Exception:
             return None
 
@@ -167,3 +207,10 @@ class LocalStorage(Storage):
             return True
         else:
             return False
+
+    def download_file(self, key: str) -> Optional[bytes]:
+        full_path = self._full_path(key)
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as f:
+                return f.read()
+        return None
