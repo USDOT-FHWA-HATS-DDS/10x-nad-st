@@ -146,7 +146,8 @@ class AuthenticationImplementation(Authentication):
             return None
 
         redirect_uri = url_for(
-            "index",
+            "auth.oauth2_callback",
+            provider=provider_name,
             _scheme=self._callback_url_scheme,
             _external=True,
         )

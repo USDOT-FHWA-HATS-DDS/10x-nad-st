@@ -94,7 +94,7 @@ def oauth2_authorize(provider: str):
 
 @auth_bp.route("/callback/<provider>")
 def oauth2_callback(provider: str):
-    if not current_user.is_anonymous or "error" in request.args:
+    if not current_user.is_anonymous or "error" in request.args or "code" not in request.args:
         return redirect(url_for(login_view))
 
     try:
